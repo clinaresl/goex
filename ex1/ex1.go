@@ -32,10 +32,10 @@ var version_wanted bool
 // initializes the command-line parser
 func init() {
 
-	// Flag to store the pgn file to parse
+	// Flag to store the bound
 	flag.IntVar(&bound, "bound", 1000, "upper bound")
 
-	// other optional parameters are verbose and version
+	// the only optional parameters is version
 	flag.BoolVar(&version_wanted, "version", false, "shows version info and exists")
 }
 
@@ -46,6 +46,7 @@ func showVersion(signal int) {
 	os.Exit(signal)
 }
 
+// main function
 func main() {
 
 	// parse the flags
