@@ -31,10 +31,53 @@ unidades; *n2* que consiste sólo en las unidades
 ### Ejemplo
 
 ``` sh
-$ ./ex2 --number 870458270989                                                                                        ✔  91% ♕  12.60G RAM  go1.13.8 Go
+$ ./ex2 --number 870458270989
  The number 870458270989 is not divisible by 7 and the remainder, indeed is 6
-$ ./ex2 --number 870458270990                                                                                        ✔  91% ♕  12.59G RAM  go1.13.8 Go
+$ ./ex2 --number 870458270990
  The number 870458270990 is divisible by 7!
+```
+
+## Problema #3
+
+Programar un paquete (*register*) que atienda peticiones de un pequeño servidor
+HTTP en un puerto que debe indicarse como parámetro:
+
+- Las peticiones a `"/"` deben simplemente dar la bienvenida al usuario
+- Las peticiones a `"/timestamp"` deben mostrar la hora y fecha actual
+- Las peticiones a `"/user"` deben mostrar el nombre de usuario actual
+
+Para ello, el paquete debe ofrecer una única función exportable `Serve``
+
+### Ejemplo
+
+El servicio `Serve` podría usarse como sigue:
+
+``` go
+    register.Serve(port)
+```
+
+de modo que ejecutándolo:
+
+``` sh
+$ ./test --port 8080
+```
+
+cuando se abre el explorador en la dirección `localhost:8080` se ve:
+
+``` text
+Welcome to our tiny experimental server!
+```
+
+La dirección `localhost:8080/timestamp` podría devolver:
+
+``` text
+2020-02-24 17:49:31.623037828 +0100 CET m=+51.941346902
+```
+
+y, por último, la dirección `localhost:8080/user` devuelve:
+
+``` text
+clinares
 ```
 
 # License #

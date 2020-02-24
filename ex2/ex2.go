@@ -15,8 +15,6 @@ import (
 // 1. Split the number in two parts: n1 with all digits but the units; n2 which
 // contains only the units
 // 2. If (n1-n2) is know to be divisible by 7, stop: n is divisible betwen 7.
-// 3. If (n1-n2) is a non-null number less than 7, stop: n is not divisible by
-// 7.
 // 4. Otherwise, n is divisible by 7 if and only if (n1-n2) is divisible by 7
 
 // globals
