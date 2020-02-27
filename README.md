@@ -46,7 +46,7 @@ HTTP en un puerto que debe indicarse como parámetro:
 - Las peticiones a `"/timestamp"` deben mostrar la hora y fecha actual
 - Las peticiones a `"/user"` deben mostrar el nombre de usuario actual
 
-Para ello, el paquete debe ofrecer una única función exportable `Serve``
+Para ello, el paquete debe ofrecer una única función exportable `Serve`
 
 ### Ejemplo
 
@@ -79,6 +79,72 @@ y, por último, la dirección `localhost:8080/user` devuelve:
 ``` text
 clinares
 ```
+
+
+## Problema #4
+
+Emular la funcionalidad del comando Unix ``comm``: dados dos ficheros ``FILE1``
+y ``FILE2``, dividir los contenidos de ambos ficheros en columnas: la primera
+columna debe mostrar sólo las líneas que aparecen en ``FILE1``, la segunda
+columna sólo aquellas que aparezcan en el segundo fichero, y la tercera columna
+las que aparecen en ambos. Además, el comando debe aceptar los siguientes
+argumentos:
+
+- ``1`` deshabilita la presentación de líneas en la primera columna
+- ``2`` desactiva la presentación de la segunda columna
+- ``3`` para no mostrar las líneas comunes en la tercera columna
+
+El programa no debe asumir, como en el caso del comando Unix ``comm`` que la
+entrada está ordenada, y las líneas pueden mostrarse en cualquier orden.
+
+### Ejemplo
+
+Dados los contenidos de dos ficheros:
+
+``` sh
+$ more data/file1.txt
+Gottfried Leibniz
+Gottlob Frege
+Charles Babbage
+Kurt Goedel
+Alan Turing
+Martin Davis
+
+$ more data/file2.txt
+Charles Babbage
+Richard Stallman
+Alan Turing
+Martin Davis
+Ken Thompson
+
+```
+
+Entonces las columnas generadas por el programa serían:
+
+``` sh
+$ ./ex4 -file1 data/file1.txt -file2 data/file2.txt
+Gottfried Leibniz
+Gottlob Frege
+		Charles Babbage
+Kurt Goedel
+		Alan Turing
+		Martin Davis
+	Richard Stallman
+	Ken Thompson
+```
+
+Por ejemplo, para ver sólo los contenidos comunes de ambos ficheros se puede
+hacer:
+
+``` sh
+$ ./ex4 -file1 data/file1.txt -file2 data/file2.txt -1 -2
+		Martin Davis
+		Charles Babbage
+		Alan Turing
+```
+
+Nótese que los argumentos se pasan como ``-1 -2`` y no como ``-12`` como en el
+caso del comando Unix ``comm``.
 
 # License #
 
