@@ -150,7 +150,7 @@ caso del comando Unix ``comm``.
 
 Dado un nombre de usuario de [Lichess](http:lichess.org), obtener toda la
 información pública de su perfil a través del servicio [REST API Get
-`api/user/{username}`](http:https://lichess.org/api).
+`api/user/{username}`](https://lichess.org/api#operation/playerTopNbPerfType).
 
 Es preciso tener en cuenta que la información devuelta por el servidor podrá
 tener unos campos u otros en respuesta a información sobre usuarios diferentes
