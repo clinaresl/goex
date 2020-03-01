@@ -37,7 +37,7 @@ var want_version bool
 // setup the flag environment for the on-line help
 func init() {
 
-	// first, create a command-line argument for parsing the number
+	// first, create a command-line argument for parsing the filenames
 	flag.StringVar(&file1, "file1", "", "first file used in the comparison")
 	flag.StringVar(&file2, "file2", "", "second file used in the comparison")
 
