@@ -21,6 +21,7 @@ var oneMonth, threeMonths bool
 var months int
 var sunday, monday bool
 var blocks int
+var disableHighlighting bool
 
 var want_version bool
 
@@ -43,6 +44,10 @@ func init() {
 
 	// command line argument for determining the number of months per block
 	flag.IntVar(&blocks, "blocks", 3, "Set number of calendar sheet blocks")
+
+	// command line argument to disable highlighting
+	flag.BoolVar(&disableHighlighting, "disable-highlighting", false,
+		"Disable highlighting sequence / marking character pairs of current day, holiday or text explicitly.")
 
 	// also, create an additional flag for showing the version
 	flag.BoolVar(&want_version, "version", false, "shows version info and exits")
@@ -128,14 +133,22 @@ func span(onemonth, threemonths bool, months int, ref []string) (int, time.Time,
 	// now, compute the reference date. If neither the month nor the day are
 	// given, they are assumed by default to be equal to the first one
 	var day, year = 1, 1
-	var month time.Month = 1
+	var month time.Month = time.January
 	if len(ref) == 0 {
 		day = time.Now().Day()
 		month = time.Now().Month()
 		year = time.Now().Year()
 	}
 	if len(ref) == 1 {
+
 		fmt.Sscanf(ref[0], "%d", &year)
+
+		// if only the year is provided, then the whole year should be shown,
+		// unless a number of months different than 12 has been requested
+		if months == 12 || months == 0 {
+			prev = 0
+			post = 12
+		}
 	}
 	if len(ref) == 2 {
 
@@ -155,8 +168,10 @@ func span(onemonth, threemonths bool, months int, ref []string) (int, time.Time,
 // writes in a matrix of strings the days of all dates comprising the interval
 // [from, to). Those in the interval [ref0, from) are shown a little fainted, as
 // much as those in the interval (to, ref1]. Those in the range [from, to) are
-// shown in normal font. The current date is highlighted
-func formatMonth(ref0, from, to, ref1 time.Time) []string {
+// shown in normal font. The current date is highlighted.
+//
+// Nvertheless, highlighting is disabled if disableHighlighting is given
+func formatMonth(ref0, from, to, ref1 time.Time, disableHighlighting bool) []string {
 
 	// get the current day, month and year
 	now := time.Now()
@@ -168,24 +183,47 @@ func formatMonth(ref0, from, to, ref1 time.Time) []string {
 	for ref := ref0; ref.Before(ref1) || ref.Equal(ref1); ref = ref.AddDate(0, 0, 1) {
 
 		var cell string
-		if ref.Before(from) || ref.After(to) || ref.Equal(to) {
-			if ref.Weekday() == time.Sunday {
-				cell = fmt.Sprintf("\033[38;2;120;40;40m%2d\033[0m", ref.Day())
-			} else if ref.Equal(curr) {
-				cell = fmt.Sprintf("\033[38;2;100;100;10;1m%2d\033[0m", ref.Day())
-			} else {
-				cell = fmt.Sprintf("\033[38;2;90;90;90m%2d\033[0m", ref.Day())
-			}
-		} else if ref.Equal(curr) {
-			cell = fmt.Sprintf("\033[38;2;210;210;10;1m%2d\033[0m", ref.Day())
-		} else {
 
-			// the only exception here to take care of is that sundays shall be
-			// highlighted
-			if ref.Weekday() == time.Sunday {
-				cell = fmt.Sprintf("\033[38;2;180;10;10;1m%2d\033[0m", ref.Day())
+		if disableHighlighting {
+
+			// if highlighting is disabled, just show the date with no ANSI
+			// color codes if and only if it falls within the interval [from,
+			// to)
+			if (ref.After(from) || ref.Equal(from)) && ref.Before(to) {
+
+				// the only "highlight" even in disabled mode is to show the
+				// current date in reversed video
+				if ref.Equal(curr) {
+					cell = fmt.Sprintf("\033[7m%2d\033[0m", ref.Day())
+				} else {
+					cell = fmt.Sprintf("%2d", ref.Day())
+				}
 			} else {
-				cell = fmt.Sprintf("%2d", ref.Day())
+
+				// if this date falls outside this month then just show two
+				// blank characters instead
+				cell = "  "
+			}
+		} else {
+			if ref.Before(from) || ref.After(to) || ref.Equal(to) {
+				if ref.Weekday() == time.Sunday {
+					cell = fmt.Sprintf("\033[38;2;120;40;40m%2d\033[0m", ref.Day())
+				} else if ref.Equal(curr) {
+					cell = fmt.Sprintf("\033[38;2;100;100;10;1m%2d\033[0m", ref.Day())
+				} else {
+					cell = fmt.Sprintf("\033[38;2;90;90;90m%2d\033[0m", ref.Day())
+				}
+			} else if ref.Equal(curr) {
+				cell = fmt.Sprintf("\033[38;2;210;210;10;1m%2d\033[0m", ref.Day())
+			} else {
+
+				// the only exception here to take care of is that sundays shall be
+				// highlighted
+				if ref.Weekday() == time.Sunday {
+					cell = fmt.Sprintf("\033[38;2;180;10;10;1m%2d\033[0m", ref.Day())
+				} else {
+					cell = fmt.Sprintf("%2d", ref.Day())
+				}
 			}
 		}
 		output = append(output, cell)
@@ -205,7 +243,9 @@ func formatMonth(ref0, from, to, ref1 time.Time) []string {
 // To compute the dates within the block of a specific month, the first day of
 // the week to show is required. If sunday is true then weeks start on sunday;
 // otherwise they start on mondays.
-func getDates(start time.Time, sunday bool) []string {
+//
+// Highlighting is disabled if disableHighlighting is given
+func getDates(start time.Time, sunday bool, disableHighlighting bool) []string {
 
 	// it is neccessary to know the zero date, which is the date in dd/mm/yyy
 	// format of the first cell in the output calendar for the given month. For
@@ -241,7 +281,7 @@ func getDates(start time.Time, sunday bool) []string {
 	// now that we know all the necessary dates (first day of the block, first
 	// day of the month, last day of the month and last day of the block), we
 	// return the string comprising all those dates in a single block
-	return formatMonth(zero, start, end, horizon)
+	return formatMonth(zero, start, end, horizon, disableHighlighting)
 }
 
 // getAllDates
@@ -252,7 +292,9 @@ func getDates(start time.Time, sunday bool) []string {
 // To compute the dates of all blocks in the specified range, the first day of
 // the week to show is required. If sunday is true then weeks start on sunday;
 // otherwise they start on mondays.
-func getAllDates(start, end time.Time, sunday bool) [][]string {
+//
+// Nvertheless, highlighting is disabled if disableHighlighting is given
+func getAllDates(start, end time.Time, sunday bool, disableHighlighting bool) [][]string {
 
 	// -- initialization
 	output := make([][]string, 0)
@@ -260,7 +302,7 @@ func getAllDates(start, end time.Time, sunday bool) [][]string {
 	// and now just simply add the dates of each month from 'start' until the
 	// 'end'
 	for ref := start; ref.Before(end); ref = ref.AddDate(0, 1, 0) {
-		output = append(output, getDates(ref, sunday))
+		output = append(output, getDates(ref, sunday, disableHighlighting))
 	}
 
 	// and return the requested dates
@@ -272,19 +314,27 @@ func getAllDates(start, end time.Time, sunday bool) [][]string {
 // show all months on the standard output in blocks of the given width starting
 // in the given reference date. If fullHeader takes the value true then both the
 // month and the year are shown on top of each sheet
-func displayMonths(ref time.Time, months [][]string, width int, fullHeader bool) {
+//
+// Nvertheless, highlighting is disabled if disableHighlighting is given
+func displayMonths(ref time.Time, months [][]string, width int, fullHeader bool,
+	disableHighlighting bool) {
 
 	fmt.Println()
 
 	// if the fullheader is not requested, then the year should be shown on top
 	// of the calendar sheet. This function actually assumes that months of the
-	// same year are to be displayed
-	// if !fullHeader {
-	// 	stryear := fmt.Sprintf("%d", ref.Year())
-	// 	lftmargin := fmt.Sprintf("%%%d", 21*width+3*(width-1))
-	// 	header := fmt.Sprintf()
-	// 	fmt.Println()
-	// }
+	// same year are to be displayed in such a case
+	if !fullHeader {
+		header := centerText(fmt.Sprintf("%d", ref.Year()),
+			21*width+3*(width-1))
+
+		// if highlighting is disabled then show the string in standard color
+		if disableHighlighting {
+			fmt.Printf("%s\n\n", header)
+		} else {
+			fmt.Printf("\033[38;2;10;160;120m%s\033[0m\n\n", header)
+		}
+	}
 
 	for index := 0; index < len(months); index += width {
 
@@ -305,12 +355,14 @@ func displayMonths(ref time.Time, months [][]string, width int, fullHeader bool)
 				strmonth += fmt.Sprintf(" %d", ref.AddDate(0, index+idmonth, 0).Year())
 			}
 			header += centerText(strmonth, 21) + "  "
-			// header += fmt.Sprintf(
-			// 	"%-21s",
-			// 	fmt.Sprintf(fmt.Sprintf("%%%ds", len(strmonth)+(21-len(strmonth))/2),
-			// 		strmonth)) + "  "
 		}
-		fmt.Printf("\033[38;2;10;160;120m%s\033[0m\n", header)
+
+		// if highlighting is disabled then show the string in standard color
+		if disableHighlighting {
+			fmt.Printf("%s\n", header)
+		} else {
+			fmt.Printf("\033[38;2;10;160;120m%s\033[0m\n", header)
+		}
 
 		// --weekdays
 
@@ -392,14 +444,16 @@ func main() {
 	end = time.Date(end.Year(), end.Month(), 1, 0, 0, 0, 0, time.UTC)
 
 	// decide whether the header on top of each month should show the year or
-	// not. The rule is to show it always unless a whole year is been shown
+	// not. The rule is to show it always unless a whole year has been requested
+	// to be shown
 	fullHeader := true
-	if months == 12 && start.Month() == time.January {
+	if prev == 0 && post == 12 && start.Month() == time.January {
 		fullHeader = false
 	}
 
 	// get all dates in the interval [start, end) and display them on the
 	// standard output
-	displayMonths(start, getAllDates(start, end, sunday), blocks, fullHeader)
+	displayMonths(start, getAllDates(start, end, sunday, disableHighlighting),
+		blocks, fullHeader, disableHighlighting)
 	fmt.Println()
 }
