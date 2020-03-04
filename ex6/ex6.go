@@ -312,15 +312,21 @@ func getAllDates(start, end time.Time, sunday bool, disableHighlighting bool) []
 // displayMonths
 //
 // show all months on the standard output in blocks of the given width starting
-// in the given reference date. If fullHeader takes the value true then both the
-// month and the year are shown on top of each sheet
+// in the given reference date.
+//
+// if 'sunday' is true then all weeks start on sunday; otherwise, they start on
+// monday. This is necessary to show the legend of the weekdays
+//
+// If fullHeader takes the value true then both the month and the year are shown
+// on top of each sheet
 //
 // Nvertheless, highlighting is disabled if disableHighlighting is given
-func displayMonths(ref time.Time, months [][]string, width int, fullHeader bool,
-	disableHighlighting bool) {
+func displayMonths(ref time.Time, months [][]string, sunday bool, width int,
+	fullHeader bool, disableHighlighting bool) {
 
 	fmt.Println()
 
+	// --- year header
 	// if the fullheader is not requested, then the year should be shown on top
 	// of the calendar sheet. This function actually assumes that months of the
 	// same year are to be displayed in such a case
@@ -336,6 +342,7 @@ func displayMonths(ref time.Time, months [][]string, width int, fullHeader bool,
 		}
 	}
 
+	// --- months
 	for index := 0; index < len(months); index += width {
 
 		// show the headers for all months to be printed out in this iteration
@@ -364,7 +371,42 @@ func displayMonths(ref time.Time, months [][]string, width int, fullHeader bool,
 			fmt.Printf("\033[38;2;10;160;120m%s\033[0m\n", header)
 		}
 
-		// --weekdays
+		// -- weekdays
+		header = ""
+		for idmonth := 0; idmonth < min(width, len(months)-index); idmonth++ {
+			var day0 time.Weekday
+			if sunday {
+				day0 = time.Sunday
+			} else {
+				day0 = time.Monday
+			}
+
+			// during 7 consecutive days. Admittedly, the two counters following
+			// are a little bit strange and it is clearly easier to read a loop
+			// with only one counter which adds one statement to the loop for
+			// updating the other. This structure is shown here only for
+			// educational purposes
+			for day0, iweekday := day0, 0; iweekday < 7; day0, iweekday = (day0+1)%7, iweekday+1 {
+
+				// note in the following that only the first two characters are
+				// taken. Handle this with care!! Go strings consist of runes,
+				// but fortunately weekdays are known to consist of ordinary
+				// ASCII codes and thus this expression shall work as expected
+				header += fmt.Sprintf("%2s", day0)[0:2] + " "
+			}
+
+			// and now add the blank spaces prior to the next block
+			header += "  "
+		}
+
+		// if highlighting is disabled, just show the week days
+		if disableHighlighting {
+			fmt.Printf("%s\n", header)
+		} else {
+			fmt.Printf("\033[38;2;10;160;120m%s\033[0m\n", header)
+		}
+
+		// -- dates
 
 		// Some months might span over less weeks than others but they should
 		// nevertheless be shown uniformly. Thus, compute the number of rows
@@ -454,6 +496,6 @@ func main() {
 	// get all dates in the interval [start, end) and display them on the
 	// standard output
 	displayMonths(start, getAllDates(start, end, sunday, disableHighlighting),
-		blocks, fullHeader, disableHighlighting)
+		sunday, blocks, fullHeader, disableHighlighting)
 	fmt.Println()
 }
