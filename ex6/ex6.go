@@ -197,16 +197,20 @@ func numberWeeks(month time.Month, year int, sunday bool) int {
 
 // span
 //
-// return the following values: prev, refdate, post with the following meaning
+// return the following values: prev, refdate, post, highDate and toHighlight
+// with the following meaning
 //
 // prev: number of months to display previous to the start date
 // refdate: reference date
 // post: number of months to display from the reference date
+// highDate: date to highlight ---if any
+// toHighlight: true if highDate should be highlighted and false otherwise
 //
-// For example (-1, 01 01 2020, 2) shows three months starting in december 2019
-// until march 2020 which is not shown
+// For example (-1, 01 01 2020, 2, 28 08 2020) shows three months starting in
+// december 2019 until march 2020 which is not shown, and August, 28, 1970
+// highlighted
 //
-// the input parameters are:
+// the input parameters (as provided by the user) are:
 //
 // onemonth: display a single month
 // threemonths: display three months spanning the reference date
@@ -216,10 +220,19 @@ func numberWeeks(month time.Month, year int, sunday bool) int {
 // if the reference date is empty, then the current date is taken as the
 // reference date. If onemonth and threemonth are true then three months are
 // displayed. If months is given then the maximum of any combination of months
-// is returned
-func span(onemonth, threemonths bool, months int, ref []string) (int, time.Time, int) {
+// is returned.
+//
+// If no date is to be highlighted then toHighlight takes the value false and
+// the values of highDate are undetermined. toHighlight takes the value true if
+// and only if the reference date is complete, i.e., it consists of a day, month
+// and year.
+func span(onemonth, threemonths bool, months int, ref []string) (int, time.Time, int, time.Time, bool) {
 
 	var prev, post int
+
+	// let the date to highlight take the value today by default, but no date is
+	// to be highlighted until a full reference date was given
+	highDate, toHighlight := time.Now(), false
 
 	// compute the number of months to display before the reference date and the
 	// number of months shown from the reference date
@@ -267,9 +280,13 @@ func span(onemonth, threemonths bool, months int, ref []string) (int, time.Time,
 	}
 	if len(ref) == 3 {
 		fmt.Sscanf(strings.Join(ref, " "), "%d %d %d", &day, &month, &year)
+
+		// since a full date was provided by the user then choose this to be
+		// highlighted
+		highDate, toHighlight = time.Date(year, month, day, 0, 0, 0, 0, time.UTC), true
 	}
 
-	return prev, time.Date(year, month, day, 0, 0, 0, 0, time.UTC), post
+	return prev, time.Date(year, month, day, 0, 0, 0, 0, time.UTC), post, highDate, toHighlight
 }
 
 // formatMonth
@@ -277,10 +294,10 @@ func span(onemonth, threemonths bool, months int, ref []string) (int, time.Time,
 // writes in a matrix of strings the days of all dates comprising the interval
 // [from, to). Those in the interval [ref0, from) are shown a little fainted, as
 // much as those in the interval (to, ref1]. Those in the range [from, to) are
-// shown in normal font. The current date is highlighted.
+// shown in normal font. The current date and highDate are highlighted
 //
-// Nvertheless, highlighting is disabled if disableHighlighting is given
-func formatMonth(ref0, from, to, ref1 time.Time, disableHighlighting bool) []string {
+// Highlighting is disabled if disableHighlighting is given
+func formatMonth(ref0, from, to, ref1, highDate time.Time, disableHighlighting bool) []string {
 
 	// get the current day, month and year
 	now := time.Now()
@@ -300,9 +317,9 @@ func formatMonth(ref0, from, to, ref1 time.Time, disableHighlighting bool) []str
 			// to)
 			if (ref.After(from) || ref.Equal(from)) && ref.Before(to) {
 
-				// the only "highlight" even in disabled mode is to show the
-				// current date in reversed video
-				if ref.Equal(curr) {
+				// the only highlights even in disabled mode is to show the
+				// current date and a specific date in reversed video
+				if ref.Equal(curr) || ref.Equal(highDate) {
 					cell = fmt.Sprintf("\033[7m%2d\033[0m", ref.Day())
 				} else {
 					cell = fmt.Sprintf("%2d", ref.Day())
@@ -314,16 +331,38 @@ func formatMonth(ref0, from, to, ref1 time.Time, disableHighlighting bool) []str
 				cell = "  "
 			}
 		} else {
+
+			// if this date does not fall withiin the interval [from, to)
 			if ref.Before(from) || ref.After(to) || ref.Equal(to) {
+
 				if ref.Weekday() == time.Sunday {
+
+					// if this is sunday, then highlight it but a little bit fainted
 					cell = fmt.Sprintf("\033[38;2;120;40;40m%2d\033[0m", ref.Day())
 				} else if ref.Equal(curr) {
+
+					// if it is today, then highlight it also a little bit fainted
 					cell = fmt.Sprintf("\033[38;2;100;100;10;1m%2d\033[0m", ref.Day())
+				} else if ref.Equal(highDate) {
+
+					// if it is the date to highlight, do so but a little bit
+					// fainted
+					cell = fmt.Sprintf("\033[38;2;00;120;120;1m%2d\033[0m", ref.Day())
 				} else {
+
+					// if it is neither sunday nor today, apply a fainted font
 					cell = fmt.Sprintf("\033[38;2;90;90;90m%2d\033[0m", ref.Day())
 				}
 			} else if ref.Equal(curr) {
+
+				// if the current date falls within the interval [from, to),
+				// then highlight it
 				cell = fmt.Sprintf("\033[38;2;210;210;10;1m%2d\033[0m", ref.Day())
+			} else if ref.Equal(highDate) {
+
+				// also, highlight it in case this is a date choosen explicitly
+				// by the user
+				cell = fmt.Sprintf("\033[38;2;10;210;210;1m%2d\033[0m", ref.Day())
 			} else {
 
 				// the only exception here to take care of is that sundays shall be
@@ -331,6 +370,8 @@ func formatMonth(ref0, from, to, ref1 time.Time, disableHighlighting bool) []str
 				if ref.Weekday() == time.Sunday {
 					cell = fmt.Sprintf("\033[38;2;180;10;10;1m%2d\033[0m", ref.Day())
 				} else {
+
+					// otherwise, no specific attributes are given to this cell
 					cell = fmt.Sprintf("%2d", ref.Day())
 				}
 			}
@@ -353,8 +394,11 @@ func formatMonth(ref0, from, to, ref1 time.Time, disableHighlighting bool) []str
 // the week to show is required. If sunday is true then weeks start on sunday;
 // otherwise they start on mondays.
 //
+// Both the current date and also the user-specific date in highDate are
+// highlighted
+//
 // Highlighting is disabled if disableHighlighting is given
-func getDates(start time.Time, sunday bool, disableHighlighting bool) []string {
+func getDates(start, highDate time.Time, sunday bool, disableHighlighting bool) []string {
 
 	// it is neccessary to know the zero date, which is the date in dd/mm/yyy
 	// format of the first cell in the output calendar for the given month. For
@@ -390,20 +434,23 @@ func getDates(start time.Time, sunday bool, disableHighlighting bool) []string {
 	// now that we know all the necessary dates (first day of the block, first
 	// day of the month, last day of the month and last day of the block), we
 	// return the string comprising all those dates in a single block
-	return formatMonth(zero, start, end, horizon, disableHighlighting)
+	return formatMonth(zero, start, end, horizon, highDate, disableHighlighting)
 }
 
 // getAllDates
 //
-// computes a matrix of strings, where each slices contains the dates of each
+// computes a matrix of strings, where each slice contains the dates of each
 // month, in the period [start, end).
 //
 // To compute the dates of all blocks in the specified range, the first day of
 // the week to show is required. If sunday is true then weeks start on sunday;
 // otherwise they start on mondays.
 //
+// Both the current date and also the user-specific date in highDate are
+// highlighted
+//
 // Nvertheless, highlighting is disabled if disableHighlighting is given
-func getAllDates(start, end time.Time, sunday bool, disableHighlighting bool) [][]string {
+func getAllDates(start, end, highDate time.Time, sunday bool, disableHighlighting bool) [][]string {
 
 	// -- initialization
 	output := make([][]string, 0)
@@ -411,7 +458,7 @@ func getAllDates(start, end time.Time, sunday bool, disableHighlighting bool) []
 	// and now just simply add the dates of each month from 'start' until the
 	// 'end'
 	for ref := start; ref.Before(end); ref = ref.AddDate(0, 1, 0) {
-		output = append(output, getDates(ref, sunday, disableHighlighting))
+		output = append(output, getDates(ref, highDate, sunday, disableHighlighting))
 	}
 
 	// and return the requested dates
@@ -643,7 +690,7 @@ func main() {
 
 	// now, get the number of months to show before a reference date as selected
 	// by the user, and the number of monts to show after it
-	prev, refdate, post := span(oneMonth, threeMonths, months, flag.Args())
+	prev, refdate, post, highDate, toHighlight := span(oneMonth, threeMonths, months, flag.Args())
 
 	// compute the start and end dates of the period to show
 	start := refdate.AddDate(0, -prev, 0)
@@ -652,6 +699,12 @@ func main() {
 	// but make sure to force those dates to start in day 1
 	start = time.Date(start.Year(), start.Month(), 1, 0, 0, 0, 0, time.UTC)
 	end = time.Date(end.Year(), end.Month(), 1, 0, 0, 0, 0, time.UTC)
+
+	// if no specific date was chosen to be highlighted then choose a date that
+	// will not appear in the calendar sheet for sure
+	if !toHighlight {
+		highDate = end.AddDate(1, 1, 1)
+	}
 
 	// decide whether the header on top of each month should show the year or
 	// not. The rule is to show it always unless a whole year has been requested
@@ -663,7 +716,7 @@ func main() {
 
 	// get all dates in the interval [start, end) and display them on the
 	// standard output
-	displayMonths(start, getAllDates(start, end, sunday, disableHighlighting),
+	displayMonths(start, getAllDates(start, end, highDate, sunday, disableHighlighting),
 		blocks, sunday, fullHeader, disableHighlighting, weekNumbering)
 	fmt.Println()
 }
