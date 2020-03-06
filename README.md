@@ -257,6 +257,47 @@ $ ./ex5 --user atorralba
  * Online: false
 ```
 
+## Ejercicio #6
+
+Implementar una versión mejorada del comando Unix ``cal`` que muestra un
+calendario en diferentes intervalos temporales. Los argumentos básicos que debe
+reconocer son:
+
+- ``-1`` muestra únicamente un mes
+- ``-3`` muestra el mes anterior y el siguiente al actual
+- ``--months NUMBER`` muestra el número de meses indicado a partir de la fecha
+  de inicio
+- ``sunday`` fuerza el domingo como primer día de la semana que, por
+  defecto, empiezan los lunes.
+- ``week-numbering`` numera todas las semanas de cada año
+
+Además, el comando Unix ``cal`` muestra los calendarios en bloques de tres
+meses. Se sugiere implementar un argumento adicional para poder mostrarlos en
+bloques de cualquier tamaño:
+
+- ``blocks NUMBER`` para mostrar bloques de un tamaño arbitrario
+
+Por último, la salida debe mostrar en diferentes colores la fecha actual o una
+fecha proporcionada por el usuario. También pueden distinguirse los domingos del
+resto de la semana y cualesquiera otras leyendas como el nombre del mes o los
+días de la semana. Por lo tanto, debe proporcionarse también el argumento:
+
+- ``disable-highlighting`` para mostrar el calendario en el mismo color. Las
+  fechas que se resaltan de otras (esto es, la fecha actual y la que proporcione
+  el usuario si entrega alguna), se deben mostrar en vídeo inverso.
+
+### Ejemplo
+
+Ejecutando el programa sin argumentos, se debe mostrar únicamente la fecha
+actual:
+
+``` sh
+$ ./ex6
+```
+
+![Example 1](ex6/pics/pic1.png)
+
+
 # License #
 
 goex is free software: you can redistribute it and/or modify it under
