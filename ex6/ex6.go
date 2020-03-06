@@ -17,13 +17,16 @@ const EXIT_FAILURE = 1
 
 const version = "0.1"
 
-var oneMonth, threeMonths bool
-var months int
-var sunday, monday bool
-var blocks int
-var disableHighlighting bool
-
-var want_version bool
+// flag parameters
+var (
+	oneMonth, threeMonths bool
+	months                int
+	sunday, monday        bool
+	blocks                int
+	disableHighlighting   bool
+	weekNumbering         bool
+	want_version          bool
+)
 
 // functions
 // ----------------------------------------------------------------------------
@@ -40,14 +43,18 @@ func init() {
 
 	// command line arguments for parsing the first day of the week
 	flag.BoolVar(&sunday, "sunday", false, "Display Sunday as the first day of the week")
-	flag.BoolVar(&monday, "monday", true, "Display Monday as the irst day of the week")
+	flag.BoolVar(&monday, "monday", true, "Display Monday as the first day of the week")
 
 	// command line argument for determining the number of months per block
 	flag.IntVar(&blocks, "blocks", 3, "Set number of calendar sheet blocks")
 
 	// command line argument to disable highlighting
 	flag.BoolVar(&disableHighlighting, "disable-highlighting", false,
-		"Disable highlighting sequence / marking character pairs of current day, holiday or text explicitly.")
+		"Disable highlighting sequence / marking character pairs of current day, holiday or text explicitly")
+
+	// command line argument to enable week numbering
+	flag.BoolVar(&weekNumbering, "week-numbering", false,
+		"Provide the calendar sheet with week numbers")
 
 	// also, create an additional flag for showing the version
 	flag.BoolVar(&want_version, "version", false, "shows version info and exits")
@@ -84,6 +91,108 @@ func centerText(text string, width int) string {
 	rgtmargin := fmt.Sprintf("%%%ds", len(text)+(width-len(text))/2)
 	return fmt.Sprintf(lftmargin,
 		fmt.Sprintf(rgtmargin, text))
+}
+
+// monthStart
+//
+// Return the first date shown on a calendar sheet that spans over the given
+// month/year. The resulting date is the first day of the month if and only it
+// is the first day of the week (either sunday or monday, according to the given
+// paramenter). If not, the returned date results from substracting the
+// diference with the first day of the week.
+func monthStart(month time.Month, year int, sunday bool) time.Time {
+
+	// create a date to the first day of the given month/year
+	date := time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
+
+	// now, if January 1st starts the week then readily return it
+	if (sunday && date.Weekday() == time.Sunday) ||
+		(!sunday && date.Weekday() == time.Monday) {
+		return date
+	}
+
+	// otherwise, substract the difference of days until the beginning of the
+	// week
+	var start time.Weekday
+	if sunday {
+		start = time.Sunday
+	} else {
+		start = time.Monday
+	}
+
+	// make sure that we substract an amount of days instead of moving forward
+	diff := int(start) - int(date.Weekday())
+	if diff > 0 {
+		diff -= 7
+	}
+	return date.AddDate(0, 0, diff)
+}
+
+// weekNumber
+//
+// return the week number of the first week of the given month/year given that
+// weeks start on sunday(if sunday is true) or monday (otherwise)
+func weekNumber(month time.Month, year int, sunday bool) int {
+
+	// first, get the date of the first day of the week of this month/year and
+	// also of january of the same year
+	start := monthStart(month, year, sunday)
+	begin := monthStart(time.January, year, sunday)
+
+	// the week number is then computed as the difference in hours between both
+	// dates divided by the number of hours in a week(168)
+	return int(start.Sub(begin).Hours()) / 168
+}
+
+// numberWeeks
+//
+// return the number of weeks necessary to display the specified month/year
+// taking into account that weeks start either on sunday(if sunday is given) or
+// monday, otherwise
+func numberWeeks(month time.Month, year int, sunday bool) int {
+
+	// first, create a couple of reference dates, the start and last day of the
+	// month
+	start := time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
+	end := start.AddDate(0, 1, -1)
+
+	// now, the number of weeks of this month is lower bounded by the integer
+	// quotient of the number of days of this month and 7, the number of days
+	// per week
+	nrweeks := end.Day() / 7
+
+	// now, if there is a remainder, then the number of weeks grows by one
+	remainder := end.Day() % 7
+	if remainder > 0 {
+		nrweeks++
+	}
+
+	// finally, if the first week, when displayed, shows less days than the
+	// remainder, then another week should be added
+	if sunday {
+		if int(start.Weekday()) > (int(time.Saturday)-remainder+1)%7 {
+			nrweeks++
+		}
+	} else {
+
+		// in the absence of a better expression (that could embrace both cases
+		// simultaneously), it is necessary here to make a distinction: if the
+		// first day of the week is Sunday, bear in mind that these are indexed
+		// with value 0
+		if start.Weekday() == time.Sunday && remainder > 1 {
+			nrweeks++
+		}
+		if start.Weekday() != time.Sunday && int(start.Weekday()) > 8-remainder {
+
+			// in case the first day of the week is not a sunday, then we
+			// actually apply the same rule than before where the last day of
+			// the week (sunday in this case) is represented with the value 7.
+			// After adding 1, it yields 8
+			nrweeks++
+		}
+	}
+
+	return nrweeks
 }
 
 // span
@@ -311,18 +420,21 @@ func getAllDates(start, end time.Time, sunday bool, disableHighlighting bool) []
 
 // displayMonths
 //
-// show all months on the standard output in blocks of the given width starting
-// in the given reference date.
+// show the calendar sheet comprising all the given months on the standard
+// output.
 //
 // if 'sunday' is true then all weeks start on sunday; otherwise, they start on
-// monday. This is necessary to show the legend of the weekdays
+// monday. This argument is required to properly show the legend of the weekdays
 //
 // If fullHeader takes the value true then both the month and the year are shown
-// on top of each sheet
+// on top of each month. Otherwise, an extra line is added at the top of the
+// calendar sheet to show the year displayed
 //
-// Nvertheless, highlighting is disabled if disableHighlighting is given
-func displayMonths(ref time.Time, months [][]string, sunday bool, width int,
-	fullHeader bool, disableHighlighting bool) {
+// Highlighting is disabled if disableHighlighting is given
+//
+// Weeks are numbered if and only if weekNumbering is true
+func displayMonths(ref time.Time, months [][]string, width int,
+	sunday, fullHeader, disableHighlighting, weekNumbering bool) {
 
 	fmt.Println()
 
@@ -331,8 +443,21 @@ func displayMonths(ref time.Time, months [][]string, sunday bool, width int,
 	// of the calendar sheet. This function actually assumes that months of the
 	// same year are to be displayed in such a case
 	if !fullHeader {
+
+		// compute the overall width of the calendar sheet. If week numbering
+		// has not been requested, then only the space necessary to allocate
+		// each month plus the space between months is considered
+		horizontalWidth := 21*width + 3*(width-1)
+
+		// required to show the week numbers which is four times the number of
+		// blocks(months) to show per line
+		if weekNumbering {
+			horizontalWidth += 4 * width
+		}
+
+		// and center the header properly over all the available space
 		header := centerText(fmt.Sprintf("%d", ref.Year()),
-			21*width+3*(width-1))
+			horizontalWidth)
 
 		// if highlighting is disabled then show the string in standard color
 		if disableHighlighting {
@@ -361,6 +486,12 @@ func displayMonths(ref time.Time, months [][]string, sunday bool, width int,
 				// the current month
 				strmonth += fmt.Sprintf(" %d", ref.AddDate(0, index+idmonth, 0).Year())
 			}
+
+			// if week numbering has been requested then make sure to allocate
+			// space enough to display them
+			if weekNumbering {
+				header += "    "
+			}
 			header += centerText(strmonth, 21) + "  "
 		}
 
@@ -374,6 +505,13 @@ func displayMonths(ref time.Time, months [][]string, sunday bool, width int,
 		// -- weekdays
 		header = ""
 		for idmonth := 0; idmonth < min(width, len(months)-index); idmonth++ {
+
+			// if week numbering has been requested then make sure to start
+			// reserving space enough to allocate them ---4 blank characters
+			if weekNumbering {
+				header += "    "
+			}
+
 			var day0 time.Weekday
 			if sunday {
 				day0 = time.Sunday
@@ -435,8 +573,38 @@ func displayMonths(ref time.Time, months [][]string, sunday bool, width int,
 		for week := 0; week < nbweeks; week++ {
 			line := make([]string, 0)
 
-			// first, join all dates of each month with one space in between
+			// first, join all dates within the same month with one space in
+			// between
 			for idmonth := 0; idmonth < min(width, len(months)-index); idmonth++ {
+
+				// if week numbering has been requested
+				if weekNumbering {
+
+					// get the reference date for this month
+					blockDate := ref.AddDate(0, index+idmonth, 0)
+
+					// if this month has as many weeks as 'week' then show its
+					// number
+					if week < numberWeeks(blockDate.Month(), blockDate.Year(), sunday) {
+
+						// if highlighting is enabled, then highlight the week number
+						weekNr := fmt.Sprintf("%2d: ",
+							1+week+weekNumber(blockDate.Month(),
+								blockDate.Year(),
+								sunday))
+						if !disableHighlighting {
+							weekNr = "\033[38;2;10;160;120m" + weekNr + "\033[0m"
+						}
+
+						months[index+idmonth][7*week] = weekNr + months[index+idmonth][7*week]
+					} else {
+
+						// otherwise, leave a blank space
+						months[index+idmonth][7*week] = "    " + months[index+idmonth][7*week]
+					}
+				}
+
+				// now, join all dates of this week for this month
 				line = append(line, strings.Join(months[index+idmonth][7*week:7*(1+week)], " "))
 			}
 
@@ -496,6 +664,6 @@ func main() {
 	// get all dates in the interval [start, end) and display them on the
 	// standard output
 	displayMonths(start, getAllDates(start, end, sunday, disableHighlighting),
-		sunday, blocks, fullHeader, disableHighlighting)
+		blocks, sunday, fullHeader, disableHighlighting, weekNumbering)
 	fmt.Println()
 }
