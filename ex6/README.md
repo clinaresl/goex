@@ -1,4 +1,4 @@
-## Ejercicio #6
+# Ejercicio #6
 
 Implementar una versión mejorada del comando Unix ``cal`` que muestra un
 calendario en diferentes intervalos temporales. Los argumentos básicos que debe
@@ -27,7 +27,7 @@ días de la semana. Por lo tanto, debe proporcionarse también el argumento:
   fechas que se resaltan de otras (esto es, la fecha actual y la que proporcione
   el usuario si entrega alguna), se deben mostrar en vídeo inverso.
 
-### Ejemplo
+## Ejemplo
 
 Ejecutando el programa sin argumentos, se debe mostrar únicamente el mes con la
 fecha actual:
