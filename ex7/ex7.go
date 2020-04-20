@@ -4,8 +4,11 @@ package main
 import (
 	"flag"
 	"fmt"
+	"image/gif"
+	"log"
 	"math/rand"
 	"os"
+	"time"
 
 	"github.com/clinaresl/goex/ex7/conway"
 )
@@ -19,6 +22,7 @@ const version = "0.1"
 
 // flag parameters
 var (
+	filename      string
 	width, height int
 	population    int
 	nbgenerations int
@@ -32,6 +36,9 @@ var (
 //
 // setup the flag environment for the on-line help
 func init() {
+
+	// command line arguments for parsing the name of the gif file
+	flag.StringVar(&filename, "filename", "conway.gif", "name of the GIF file")
 
 	// command line arguments for parsing the dimensions of the grid
 	flag.IntVar(&width, "width", 100, "Width of the grid")
@@ -75,6 +82,8 @@ func main() {
 	for i := 0; i < population; i++ {
 		contents[i] = true
 	}
+
+	rand.Seed(time.Now().UnixNano())
 	rand.Shuffle(width*height, func(i, j int) {
 		contents[i], contents[j] = contents[j], contents[i]
 	})
@@ -84,14 +93,19 @@ func main() {
 	phase.Set(contents)
 
 	// Create a Conway's Game with this phase
-	conway := conway.NewConway(width, height, nbgenerations, phase)
+	game := conway.NewConway(width, height, nbgenerations, phase)
 
 	// and run the Conway's Game over this initial generation
-	conway.Run()
+	game.Run()
 
-	for igeneration := 0; igeneration < nbgenerations; igeneration++ {
-		fmt.Println(conway.Get(igeneration))
-		fmt.Println()
+	// get the image of the entire Conway's game
+	anim := game.GetGIF()
+
+	f, err := os.Create(filename)
+	if err != nil {
+		log.Fatal(err)
 	}
+	defer f.Close()
 
+	gif.EncodeAll(f, &anim)
 }
