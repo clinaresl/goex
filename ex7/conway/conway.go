@@ -18,11 +18,6 @@ import (
 type phase struct {
 	width, height int
 	contents      []bool
-
-	// note that each phase also keeps the number of alive cells around each
-	// cell. This is done to avoid re-computing information and thus, to make
-	// the Conway's Games faster ---Conway deserves it!
-	alive []int
 }
 
 // methods
@@ -30,13 +25,11 @@ type phase struct {
 // return a new phase which is initially empty
 func NewPhase(width, height int) phase {
 
-	// note that in creation, room is allocated for both the contents and the
-	// number of alive cells around each cell
+	// note that in creation, room is allocated for storing the contents
 	return phase{
 		width:    width,
 		height:   height,
-		contents: make([]bool, width*height),
-		alive:    make([]int, width*height)}
+		contents: make([]bool, width*height)}
 }
 
 // return the index of a position (x, y)
@@ -104,7 +97,7 @@ func (p *phase) nbalive(x, y int) (result int) {
 		}
 	}
 
-	// and return (implicitly) the number of alive cells around (x, y)
+	// and return the number of alive cells around (x, y)
 	return
 }
 
@@ -134,7 +127,7 @@ func (p *phase) Next() phase {
 		for y := 0; y < p.height; y++ {
 
 			// get the number of cells alive around cell (x, y)
-			alive := p.alive[p.offset(x, y)]
+			alive := p.nbalive(x, y)
 
 			// by default, the next population is empty, i.e., all of them are
 			// dead and thus, the only rules considered are those that make some
@@ -154,14 +147,6 @@ func (p *phase) Next() phase {
 		}
 	}
 
-	// before leaving update the number of cells alive around each cell
-	// count the number of alive cells around each cell
-	for x := 0; x < p.width; x++ {
-		for y := 0; y < p.height; y++ {
-			next.alive[next.offset(x, y)] = next.nbalive(x, y)
-		}
-	}
-
 	// and return the next phase
 	return next
 }
@@ -176,13 +161,6 @@ func (p *phase) Set(contents []bool) error {
 
 	// otherwise, just set the contents of the phase to those given in the slice
 	p.contents = contents
-
-	// count the number of alive cells around each cell
-	for x := 0; x < p.width; x++ {
-		for y := 0; y < p.height; y++ {
-			p.alive[p.offset(x, y)] = p.nbalive(x, y)
-		}
-	}
 
 	// and return no error
 	return nil
