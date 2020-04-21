@@ -55,12 +55,12 @@ func (p *phase) GetImage(palette []color.Color) *image.Paletted {
 
 // methods
 
-// returns a gif animation of the Conway's game
-
-func (g *Conway) GetGIF() gif.GIF {
+// returns a gif animation of the Conway's game with the given delay in 100th of
+// a second between frames
+func (g *Conway) GetGIF(delay int) gif.GIF {
 
 	// create an array of images and delays between successive images
-	var delay []int = make([]int, g.generations)
+	var delays []int = make([]int, g.generations)
 	var images []*image.Paletted = make([]*image.Paletted, g.generations)
 
 	// first, create a simple palete with two colors for drawing dead and living
@@ -71,10 +71,10 @@ func (g *Conway) GetGIF() gif.GIF {
 	for index, phase := range g.phases {
 
 		// add the next image after 1 100th of a second
-		delay[index] = 1
+		delays[index] = delay
 		images[index] = phase.GetImage(palette)
 	}
 
 	// and now return the GIF image
-	return gif.GIF{Delay: delay, Image: images}
+	return gif.GIF{Delay: delays, Image: images}
 }
